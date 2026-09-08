@@ -1,0 +1,53 @@
+import "dotenv/config";
+import express from "express";
+import { prisma } from "./lib/prisma.js";
+
+const app = express();
+const PORT = 3000;
+
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("Funcionando!");
+});
+
+app.get("/animais", async (req, res) => {
+  const animais = await prisma.animal.findMany();
+  res.json(animais);
+});
+
+app.post("/animais", async (req, res) => {
+  const { nome, especie, idade, descricao, fotoUrl, } = req.body;
+  const novoAnimal = await prisma.animal.create({
+    data: {
+      nome,
+      especie,
+      idade,
+      descricao,
+      fotoUrl,
+    }
+  });
+  res.status(201).json(novoAnimal);
+});
+
+app.patch("/animais/:id", async (req, res) => {
+  const { id } = req.params;
+  const { adotado } = req.body;
+  const animalAtualizado = await prisma.animal.update({
+    where: { id },
+    data: { adotado },
+  });
+  res.json(animalAtualizado);
+});
+
+app.delete("/animais/:id", async (req, res) => {
+  const { id } = req.params;
+  await prisma.animal.delete({
+    where: { id },
+  });
+  res.status(204).send();
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando em http://localhost:${PORT}`);
+});
