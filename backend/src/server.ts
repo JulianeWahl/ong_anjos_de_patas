@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import session from "express-session";
 import { prisma } from "./lib/prisma.js";
+import bcrypt from "bcrypt";
 
 const app = express();
 const PORT = 3000;
@@ -58,6 +59,28 @@ app.delete("/animais/:id", async (req, res) => {
     where: { id },
   });
   res.status(204).send();
+});
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const admin = await prisma.admin.findUnique({
+    where: { email },
+  });
+
+  if (!admin) {
+    return res.status(401).json({ erro: "Email ou senha inválidos" });
+  }
+
+  const senhaCorreta = await bcrypt.compare(password, admin.password);
+
+  if (!senhaCorreta) {
+    return res.status(401).json({ erro: "Email ou senha inválidos" });
+  }
+
+  req.session.adminId = admin.id;
+
+  res.json({ mensagem: "Login realizado com sucesso" });
 });
 
 app.listen(PORT, () => {
