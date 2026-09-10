@@ -1,11 +1,23 @@
 import "dotenv/config";
 import express from "express";
+import session from "express-session";
 import { prisma } from "./lib/prisma.js";
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "secret-da-ong-anjos-de-patas-session-2026-rs",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24, // 1 dia
+    },
+  })
+);
 
 app.get("/", (req, res) => {
   res.send("Funcionando!");
