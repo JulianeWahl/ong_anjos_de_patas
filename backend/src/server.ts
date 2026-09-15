@@ -3,6 +3,7 @@ import express from "express";
 import session from "express-session";
 import { prisma } from "./lib/prisma.js";
 import bcrypt from "bcrypt";
+import { exigirLogin } from "./middleware/auth.js";
 
 const app = express();
 const PORT = 3000;
@@ -15,7 +16,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24, // 1 dia
+      maxAge: 1000 * 60 * 60 * 24, 
     },
   })
 );
@@ -81,6 +82,10 @@ app.post("/login", async (req, res) => {
   req.session.adminId = admin.id;
 
   res.json({ mensagem: "Login realizado com sucesso" });
+});
+
+app.get("/admin/teste", exigirLogin, (req, res) => {
+  res.json({ mensagem: "Você está logado! Acesso liberado." });
 });
 
 app.listen(PORT, () => {
