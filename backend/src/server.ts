@@ -84,6 +84,15 @@ app.post("/login", async (req, res) => {
   res.json({ mensagem: "Login realizado com sucesso" });
 });
 
+app.post("/logout", (req, res) => {
+  req.session.destroy((erro) => {
+    if (erro) {
+      return res.status(500).json({ erro: "Erro ao sair" });
+    }
+    res.json({ mensagem: "Logout realizado com sucesso" });
+  });
+});
+
 app.get("/admin/teste", exigirLogin, (req, res) => {
   res.json({ mensagem: "Você está logado! Acesso liberado." });
 });
