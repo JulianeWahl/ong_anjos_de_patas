@@ -1,11 +1,25 @@
 import "dotenv/config";
 import express from "express";
+import session from "express-session";
 import { prisma } from "./lib/prisma.js";
+import bcrypt from "bcrypt";
+import { exigirLogin } from "./middleware/auth.js";
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "secret-da-ong-anjos-de-patas-session-2026-rs",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24, 
+    },
+  })
+);
 
 app.get("/", (req, res) => {
   res.send("Funcionando!");
@@ -46,6 +60,41 @@ app.delete("/animais/:id", async (req, res) => {
     where: { id },
   });
   res.status(204).send();
+});
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const admin = await prisma.admin.findUnique({
+    where: { email },
+  });
+
+  if (!admin) {
+    return res.status(401).json({ erro: "Email ou senha inválidos" });
+  }
+
+  const senhaCorreta = await bcrypt.compare(password, admin.password);
+
+  if (!senhaCorreta) {
+    return res.status(401).json({ erro: "Email ou senha inválidos" });
+  }
+
+  req.session.adminId = admin.id;
+
+  res.json({ mensagem: "Login realizado com sucesso" });
+});
+
+app.post("/logout", (req, res) => {
+  req.session.destroy((erro) => {
+    if (erro) {
+      return res.status(500).json({ erro: "Erro ao sair" });
+    }
+    res.json({ mensagem: "Logout realizado com sucesso" });
+  });
+});
+
+app.get("/admin/teste", exigirLogin, (req, res) => {
+  res.json({ mensagem: "Você está logado! Acesso liberado." });
 });
 
 app.listen(PORT, () => {
