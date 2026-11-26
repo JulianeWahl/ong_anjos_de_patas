@@ -2,22 +2,34 @@ import "dotenv/config";
 import bcrypt from "bcrypt";
 import { prisma } from "./lib/prisma.js";
 
+// Uso: npm run criar-admin -- email@da-ong.org "uma senha forte"
+// A senha NÃO fica no código, então não vai parar no GitHub.
 async function criarAdmin() {
-  const email = "email@exemplo.com"; // colocar o email da ONG
-  const senhaPura = "senha123"; // trocar pela senha da ONG
+  const [emailDigitado, senhaPura] = process.argv.slice(2);
 
-  const senhaCriptografada = await bcrypt.hash(senhaPura, 10);
+  if (!emailDigitado || !senhaPura) {
+    throw new Error('Uso: npm run criar-admin -- email@da-ong.org "senha forte"');
+  }
+  if (senhaPura.length < 10) {
+    throw new Error("Use uma senha com pelo menos 10 caracteres");
+  }
 
-  const admin = await prisma.admin.create({
-    data: {
-      email,
-      password: senhaCriptografada,
-    },
+  const email = emailDigitado.trim().toLowerCase();
+  const senhaCriptografada = await bcrypt.hash(senhaPura, 12);
+
+  // upsert: cria o admin ou, se o e-mail já existir, troca a senha.
+  const admin = await prisma.admin.upsert({
+    where: { email },
+    create: { email, password: senhaCriptografada },
+    update: { password: senhaCriptografada },
   });
 
-  console.log("Admin criado com sucesso:", admin.email);
+  console.log("Admin pronto:", admin.email);
 }
 
 criarAdmin()
-  .catch((erro) => console.error("Erro ao criar admin:", erro))
-  .finally(() => process.exit());
+  .catch((erro) => {
+    console.error("Erro ao criar admin:", erro.message ?? erro);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

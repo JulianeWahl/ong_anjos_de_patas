@@ -1,100 +1,82 @@
 import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
 import express from "express";
+import type { Request, Response, NextFunction } from "express";
 import session from "express-session";
-import { prisma } from "./lib/prisma.js";
-import bcrypt from "bcrypt";
-import { exigirLogin } from "./middleware/auth.js";
+import connectPgSimple from "connect-pg-simple";
+import { publicRouter } from "./routes/public.js";
+import { adminRouter } from "./routes/admin.js";
+
+// ---------- Configuração (vem do .env) ----------
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) {
+  // Sem segredo, qualquer um poderia forjar o cookie de sessão. Melhor nem iniciar.
+  throw new Error("Defina SESSION_SECRET no arquivo .env (veja o .env.example)");
+}
+const PORT = Number(process.env.PORT) || 3000;
+const emProducao = process.env.NODE_ENV === "production";
+
+// Pastas (caminhos calculados a partir deste arquivo: backend/src/)
+const PASTA_VIEWS = path.join(import.meta.dirname, "../../frontend/views");
+const PASTA_PUBLIC = path.join(import.meta.dirname, "../../frontend/public");
+const PASTA_UPLOADS = path.join(import.meta.dirname, "../../uploads");
+fs.mkdirSync(PASTA_UPLOADS, { recursive: true });
 
 const app = express();
-const PORT = 3000;
 
-app.use(express.json());
+// ---------- EJS ----------
+app.set("view engine", "ejs");
+app.set("views", PASTA_VIEWS);
+
+// ---------- Leitura do corpo das requisições ----------
+app.use(express.urlencoded({ extended: true })); // formulários HTML
+app.use(express.json()); // JSON (Insomnia, por exemplo)
+
+// ---------- Arquivos estáticos ----------
+app.use(express.static(PASTA_PUBLIC)); // /css/style.css, /img/logo.png...
+app.use("/uploads", express.static(PASTA_UPLOADS)); // fotos dos animais
+
+// ---------- Sessão ----------
+// Em produção a hospedagem fica atrás de um proxy HTTPS; isso permite o cookie "secure".
+if (emProducao) app.set("trust proxy", 1);
+
+// As sessões ficam guardadas no próprio Postgres (tabela "session", criada sozinha),
+// então o admin não é deslogado quando o servidor reinicia.
+const PgStore = connectPgSimple(session);
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "secret-da-ong-anjos-de-patas-session-2026-rs",
+    store: new PgStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true,
+    }),
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24, 
+      maxAge: 1000 * 60 * 60 * 24, // 1 dia
+      httpOnly: true, // JavaScript da página não consegue ler o cookie
+      sameSite: "lax", // outros sites não conseguem enviar formulários usando o cookie
+      secure: emProducao, // só envia o cookie por HTTPS em produção
     },
   })
 );
 
-app.get("/", (req, res) => {
-  res.send("Funcionando!");
+// ---------- Rotas ----------
+app.use(publicRouter);
+app.use("/admin", adminRouter);
+
+// ---------- 404: nenhuma rota respondeu ----------
+app.use((req: Request, res: Response) => {
+  res.status(404).render("publico/404", { titulo: "Página não encontrada" });
 });
 
-app.get("/animais", async (req, res) => {
-  const animais = await prisma.animal.findMany();
-  res.json(animais);
-});
-
-app.post("/animais", async (req, res) => {
-  const { nome, especie, idade, descricao, fotoUrl, } = req.body;
-  const novoAnimal = await prisma.animal.create({
-    data: {
-      nome,
-      especie,
-      idade,
-      descricao,
-      fotoUrl,
-    }
-  });
-  res.status(201).json(novoAnimal);
-});
-
-app.patch("/animais/:id", async (req, res) => {
-  const { id } = req.params;
-  const { adotado } = req.body;
-  const animalAtualizado = await prisma.animal.update({
-    where: { id },
-    data: { adotado },
-  });
-  res.json(animalAtualizado);
-});
-
-app.delete("/animais/:id", async (req, res) => {
-  const { id } = req.params;
-  await prisma.animal.delete({
-    where: { id },
-  });
-  res.status(204).send();
-});
-
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  const admin = await prisma.admin.findUnique({
-    where: { email },
-  });
-
-  if (!admin) {
-    return res.status(401).json({ erro: "Email ou senha inválidos" });
-  }
-
-  const senhaCorreta = await bcrypt.compare(password, admin.password);
-
-  if (!senhaCorreta) {
-    return res.status(401).json({ erro: "Email ou senha inválidos" });
-  }
-
-  req.session.adminId = admin.id;
-
-  res.json({ mensagem: "Login realizado com sucesso" });
-});
-
-app.post("/logout", (req, res) => {
-  req.session.destroy((erro) => {
-    if (erro) {
-      return res.status(500).json({ erro: "Erro ao sair" });
-    }
-    res.json({ mensagem: "Logout realizado com sucesso" });
-  });
-});
-
-app.get("/admin/teste", exigirLogin, (req, res) => {
-  res.json({ mensagem: "Você está logado! Acesso liberado." });
+// ---------- Erros inesperados ----------
+// O Express 5 manda para cá qualquer erro lançado dentro das rotas (inclusive async).
+app.use((erro: unknown, req: Request, res: Response, _next: NextFunction) => {
+  console.error(erro);
+  res.status(500).send("Ocorreu um erro inesperado. Tente novamente mais tarde.");
 });
 
 app.listen(PORT, () => {
