@@ -8,10 +8,7 @@ Sistema web desenvolvido para uma ONG de proteção animal, com o objetivo de cr
 
 O ONG Anjos de Patas é um projeto de site institucional desenvolvido para uma organização de proteção animal.
 
-O projeto é dividido em duas partes independentes, cada uma com seu próprio `package.json`:
-
-- **backend/**: API em Node.js, Express e TypeScript, usando Prisma para comunicação com o banco de dados PostgreSQL.
-- **frontend/**: interface em React com TypeScript, criada com Vite.
+A aplicação é construída com Node.js, Express e TypeScript, usando Prisma para comunicação com o banco de dados PostgreSQL. As páginas são renderizadas no servidor com EJS e estilizadas com Tailwind CSS.
 
 🛠️ **Tecnologias:**
 - Node.js
@@ -19,8 +16,8 @@ O projeto é dividido em duas partes independentes, cada uma com seu próprio `p
 - TypeScript
 - Prisma ORM
 - PostgreSQL
-- React
-- Vite
+- EJS
+- Tailwind CSS
 
 ## 📁 Estrutura
 
@@ -28,41 +25,31 @@ O projeto é dividido em duas partes independentes, cada uma com seu próprio `p
 ong_anjos_de_patas/
 ├── backend/
 │   ├── prisma/          # schema e migrations do banco
-│   ├── src/             # código da API
-│   ├── prisma.config.ts
-│   └── package.json
-└── frontend/
-    ├── src/             # código da interface React
-    └── package.json
+│   └── src/             # código do servidor
+├── frontend/
+│   ├── src/input.css    # entrada do Tailwind
+│   └── public/css/      # style.css gerado pelo Tailwind
+├── package.json
+└── prisma.config.ts
 ```
 
 ## ▶️ Como rodar
 
-### Backend
-
-Crie um arquivo `.env` dentro de `backend/` com:
+Crie um arquivo `.env` na raiz do projeto com:
 
 ```
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/anjos_de_patas"
 SESSION_SECRET="uma-string-secreta"
 ```
 
-Depois, dentro de `backend/`:
+Depois, na raiz:
 
 ```bash
 npm install
-npx prisma migrate dev     # aplica as migrations no banco
-npx tsx src/criar_admin.ts # cria o usuário admin (edite email e senha antes)
-npx tsx src/server.ts      # inicia a API em http://localhost:3000
-```
-
-### Frontend
-
-Dentro de `frontend/`:
-
-```bash
-npm install
-npm run dev                # inicia em http://localhost:5173
+npx prisma migrate dev             # aplica as migrations no banco
+npx tsx backend/src/criar_admin.ts # cria o usuário admin (edite email e senha antes)
+npx tsx backend/src/server.ts      # inicia o servidor em http://localhost:3000
+npm run css                        # gera o CSS do Tailwind e fica observando mudanças
 ```
 
 ## 👩‍💻 Autoras
